@@ -1,10 +1,14 @@
 import { S3Client, PutObjectCommand, ListObjectsCommand} from "@aws-sdk/client-s3";
+import { fromEnv } from "@aws-sdk/credential-provider-env";
 import { saveFileRecord } from "../services/fileService.js";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const s3 = new S3Client({ region: process.env.AWS_REGION });
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: fromEnv(),
+});
 
 export const uploadFile = async (req, res) => {
   try {
@@ -22,7 +26,7 @@ export const uploadFile = async (req, res) => {
     const fileData = {
       fileName: file.originalname,
       filePath: uploadParams.Key,
-      fileSize: file.buffer.length, // Adjusted to use buffer length
+      fileSize: file.buffer.length,
       fileExtension: file.originalname.split(".").pop(),
       bucketName: process.env.S3_BUCKET_NAME,
     };
