@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand, ListObjectsCommand} from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, ListObjectsCommand, GetObjectCommand} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { fromEnv } from "@aws-sdk/credential-provider-env";
 import { saveFileRecord } from "../services/fileService.js";
 import dotenv from "dotenv";
@@ -52,18 +53,32 @@ export const listFiles = async (req, res) => {
     const command = new ListObjectsCommand(listParams);
     const result = await s3.send(command);
 
-    // Assuming files are returned as an array in result.Contents
-    const files = result.Contents.map((file) => ({
-      fileName: file.Key,
-      filePath: file.Key,
-      fileSize: file.Size,
-      fileExtension: file.Key.split(".").pop(),
-      bucketName: process.env.S3_BUCKET_NAME,
-    }));
-    console.log("listFiles controller ended");
+    const files = await Promise.all(
+      result.Contents.map(async (file) => {
+        const getObjectParams = {
+          Bucket: process.env.S3_BUCKET_NAME,
+          Key: file.Key,
+        };
 
+        const url = await getSignedUrl(s3, new GetObjectCommand(getObjectParams), {
+          expiresIn: 3600,
+        });
+
+        return {
+          fileName: file.Key,
+          filePath: file.Key,
+          fileSize: file.Size,
+          fileExtension: file.Key.split(".").pop(),
+          bucketName: process.env.S3_BUCKET_NAME,
+          url: url,
+        };
+      })
+    );
+
+    console.log("listFiles controller ended");
     res.status(200).json(files);
   } catch (error) {
     res.status(500).json({ error: "Error fetching files: " + error.message });
   }
 };
+
